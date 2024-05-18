@@ -19,11 +19,11 @@ from datetime import date
 # survey must have columns named 'easting', 'northing', 'elevation','pointid','pointcode'
 # there can be more columns and the mandatory ones can be in any order
 # change all single backslashes to double backslashes, make sure there are backslashes at the end
-survey_filepath = 'C:\\Users\\bondh\\Box\\Dynamic_Revetments_OSG_2022\\SurveyData\\2Cleaned\\Westport\\'
+survey_filepath = 'C:\\Users\\bondh\\Box\\Dynamic_Revetments_OSG_2022\\SurveyData\\2Cleaned\\FC\\'
 # if you want to process all surveys in folder, change the following to true
 # all surveys in folder must be from same site
-process_all_surveys = True
-survey_filename = '' + '.csv' # can leave blank if process_all_surveys = True
+process_all_surveys = False
+survey_filename = 'FC_20240105' + '.csv' # can leave blank if process_all_surveys = True
 survey_columns = ['easting', 'northing', 'elevation', 'pointid', 'pointcode']
 
 # transect information - must be csv file. 
@@ -31,17 +31,17 @@ survey_columns = ['easting', 'northing', 'elevation', 'pointid', 'pointcode']
 # there can be more columns and the mandatory columns can be in any order
 # change all single backslashes to double backslashes, make sure there are backslashes at the end
 transects_filepath = 'C:\\Users\\bondh\Box\\Dynamic_Revetments_OSG_2022\\SurveyData\\survey_transects\\'
-transects_filename = 'Westport_lines' + '.csv'
+transects_filename = 'FC_lines' + '.csv'
 transects_columns = ['easting_start', 'northing_start', 'easting_end', 'northing_end', 'transect_name']
 
 # output directory for processed data
 # change all single backslashes to double backslashes, make sure there are backslashes at the end
-output_filepath = 'C:\\Users\\bondh\\Box\\Dynamic_Revetments_OSG_2022\\SurveyData\\3Processed\\Westport\\'
+output_filepath = 'C:\\Users\\bondh\\Box\\Dynamic_Revetments_OSG_2022\\SurveyData\\3Processed\\FC\\'
 
 # processing options
 max_offset = 3 #any points beyond this distance from line will be thrown out
-max_gap = 5 # if gap between points is bigger than this, insert nans
 interval = .5 # separates transect into bins of this size, and picks point with smallest offset within bin to save
+min_points = 20 # transect must have this number of points to be included in file
 include_feature_codes = True
 featurecodes = ['cobble_toe','rev_toe', 'photo']
 
@@ -50,7 +50,7 @@ featurecodes = ['cobble_toe','rev_toe', 'photo']
 processing_figures_on = True
 # output directory for quality control figures
 # change all single backslashes to double backslashes, make sure there are backslashes at the end
-fig_output_filepath = 'C:\\Users\\bondh\\Box\\Dynamic_Revetments_OSG_2022\\SurveyData\\4ProcessingFigs\\Westport\\'
+fig_output_filepath = 'C:\\Users\\bondh\\Box\\Dynamic_Revetments_OSG_2022\\SurveyData\\4ProcessingFigs\\FC\\'
 # each transect will create 3 subplots in final figure, use below variable to control their location
 # look up subplotmosaic to understand how to set this up
 profile_fig_mosaic ="""
@@ -136,8 +136,10 @@ for name in survey_filename:
                         intersection = np.logical_and(oidx, didx) 
                 else:
                     intersection = np.logical_and(oidx, didx)
-                # prevent error from empty series            
+                # if no points meet criteria, add row of nans          
                 if not intersection.any():
+                    if include_feature_codes:
+                        continue
                     continue
                 else:
                     # find index of point within bin that has smallest offset
@@ -148,23 +150,26 @@ for name in survey_filename:
                     dout_z = data['elevation'][tidx]
                     dout_dist = dist[tidx]
                     dout_offset = offset[tidx]
-                    dout_feature = data['pointcode'][tidx]
+                    if include_feature_codes:
+                        dout_feature = data['pointcode'][tidx]
                     dout_transect_name = row['transect_name']
-                    # if there is a gap bigger than max_gap, insert row of nans
-                    if len(ls)>0:
-                        gap = dout_dist - ls[-1][3]
-                        if gap > max_gap:
-                            ls.append(np.full(7, np.nan).tolist())
                     # add points to a list
-                    
-                    ls.append([dout_x, dout_y, dout_z, dout_dist, dout_offset, dout_feature, dout_transect_name])
+                    if include_feature_codes:
+                        ls.append([dout_x, dout_y, dout_z, dout_dist, dout_offset, dout_feature, dout_transect_name])
+                    else:
+                        ls.append([dout_x, dout_y, dout_z, dout_dist, dout_offset, dout_transect_name])
+        num_points = len([x for x in ls if row['transect_name'] in x])
+        if num_points < min_points:
+            ls = [x for x in ls if row['transect_name'] not in x]
     # create dataframe from list
-           
-    data_out = pd.DataFrame(data = ls, columns = ['x','y', 'z', 'dist', 'offset', 'feature', 'transect_name'])
+    if include_feature_codes:
+        data_out = pd.DataFrame(data = ls, columns = ['x','y', 'z', 'dist', 'offset', 'feature', 'transect_name'])
+    else:
+        data_out = pd.DataFrame(data = ls, columns = ['x','y', 'z', 'dist', 'offset', 'transect_name'])
     data_out.to_csv(output_filepath + name, index=False)
     
 ##% processing figures
-    fig, axd = plt.subplot_mosaic(profile_fig_mosaic)
+    fig1, ax1 = plt.subplot_mosaic(profile_fig_mosaic)
     ii = 0
     while ii < len(profile_axes_list)-1:
         for index, row in transect_lines.iterrows():
@@ -172,22 +177,22 @@ for name in survey_filename:
             
             x = [row['easting_start'], row['easting_end']]
             y = [row['northing_start'], row['northing_end']]
-            axd[profile_axes_list[ii]].plot(x,y)
+            ax1[profile_axes_list[ii]].plot(x,y)
             x = df['x']
             y =  df['y']
-            axd[profile_axes_list[ii]].scatter(x,y)
+            ax1[profile_axes_list[ii]].scatter(x,y)
             
-            axd[profile_axes_list[ii]].set_xlabel('Easting (m)')
-            axd[profile_axes_list[ii]].set_ylabel('Northing (m)')
-            axd[profile_axes_list[ii]].set_title(row['transect_name'])
+            ax1[profile_axes_list[ii]].set_xlabel('Easting (m)')
+            ax1[profile_axes_list[ii]].set_ylabel('Northing (m)')
+            ax1[profile_axes_list[ii]].set_title(row['transect_name'])
             ii = ii + 1
             
             x = df['dist']
             y = df['z']
-            axd[profile_axes_list[ii]].plot(x,y)
-            axd[profile_axes_list[ii]].set_xlabel('Distance (m)')
-            axd[profile_axes_list[ii]].set_ylabel('Elevation (m NAVD88)')
-            axd[profile_axes_list[ii]].set_title(row['transect_name'])
+            ax1[profile_axes_list[ii]].plot(x,y)
+            ax1[profile_axes_list[ii]].set_xlabel('Distance (m)')
+            ax1[profile_axes_list[ii]].set_ylabel('Elevation (m NAVD88)')
+            ax1[profile_axes_list[ii]].set_title(row['transect_name'])
             ii = ii + 1
             
             if df.empty:
@@ -195,38 +200,51 @@ for name in survey_filename:
             else:
                 x = df['dist'].iloc[[0, -1]]
             y = [0,0]
-            axd[profile_axes_list[ii]].plot(x,y)
+            ax1[profile_axes_list[ii]].plot(x,y)
             
             x = df['dist']
             y = df['offset']
-            axd[profile_axes_list[ii]].plot(x,y)
-            axd[profile_axes_list[ii]].plot(x,y)
-            axd[profile_axes_list[ii]].set_xlabel('Distance (m)')
-            axd[profile_axes_list[ii]].set_ylabel('Offset from line (m)')
-            axd[profile_axes_list[ii]].set_title(row['transect_name'])
+            ax1[profile_axes_list[ii]].plot(x,y)
+            ax1[profile_axes_list[ii]].plot(x,y)
+            ax1[profile_axes_list[ii]].set_xlabel('Distance (m)')
+            ax1[profile_axes_list[ii]].set_ylabel('Offset from line (m)')
+            ax1[profile_axes_list[ii]].set_title(row['transect_name'])
             ii = ii + 1
             
-            fig.tight_layout()
+            fig1.tight_layout()
             fig_filename = fig_output_filepath + name.replace('.csv', '') + '_profiles'
-            fig.savefig(fig_filename)
+            fig1.savefig(fig_filename)
             plt.close()       
             
-    fig, ax = plt.subplots()
+    fig2, ax2 = plt.subplots()
+    for index, row in transect_lines.iterrows():
+        x = [row['easting_start'], row['easting_end']]
+        y = [row['northing_start'], row['northing_end']]
+        ax2.plot(x,y, zorder=1,color= '#1f77b4')
+    
     x = data['easting']
     y = data['northing']
-    ax.scatter(x,y)
+    ax2.scatter(x,y, zorder=2)
     
     x = data_out['x']
     y = data_out['y']
-    ax.scatter(x,y)
+    ax2.scatter(x,y, zorder=3)
     
-    ax.set_xlabel('Easting (m)')
-    ax.set_ylabel('Northing (m)')
+    xmin = np.min(data['easting']) - 5
+    xmax = np.max(data['easting']) + 5
+    ymin = np.min(data['northing']) - 5
+    ymax = np.max(data['northing']) + 5
     
-    txt = 'max offset = ' + str(max_offset) +'\nmax gap = ' + str(max_gap) + '\ninterval = ' + str(interval) +  '\nfeature codes = ' + str(featurecodes) + '\nprocessed on ' + str(date.today())
+    ax2.set_xlim([xmin,xmax])
+    ax2.set_ylim([ymin,ymax])
     
-    ax.text(0.1, 0.1, txt, transform=ax.transAxes)
+    ax2.set_xlabel('Easting (m)')
+    ax2.set_ylabel('Northing (m)')
+    
+    txt = 'max offset = ' + str(max_offset) +'\nmin point = ' + str(min_points) + '\ninterval = ' + str(interval) +  '\nfeature codes = ' + str(featurecodes) + '\nprocessed on ' + str(date.today())
+    
+    ax2.text(0.1, 0.1, txt, transform=ax2.transAxes)
     
     fig_filename = fig_output_filepath + name.replace('.csv', '') + '_map'
-    fig.savefig(fig_filename)
+    fig2.savefig(fig_filename)
     plt.close()       
