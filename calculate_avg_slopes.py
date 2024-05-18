@@ -6,7 +6,8 @@ import os
 from datetime import date
 
 input_filepath ='C:\\Users\\bondh\Box\\HaileyBond\\phd\\arch cape\\surveys\\4_analysis\\cobble_slopes\\'
-
+output_filepath = 'C:\\Users\\bondh\Box\\HaileyBond\\phd\\arch cape\\surveys\\4_analysis\\cobble_slopes\\'
+output_filename = 'average_slopes.csv'
 files = []
 for file in glob(input_filepath + '*.csv'):
     files.append(file)
@@ -21,4 +22,5 @@ for file in filenames:
         avg_slope = data['slope'].mean()
         std_dev = data['slope'].std()
         data_out.append([transect, avg_slope, std_dev])
-        
+data_out = pd.DataFrame(data_out, columns = ['transect_name', 'slope', 'std_dev'])
+data_out.to_csv(output_filepath + output_filename, index=False)        
