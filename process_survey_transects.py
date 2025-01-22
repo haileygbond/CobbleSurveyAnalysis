@@ -23,7 +23,7 @@ survey_filepath = 'C:\\Users\\bondh\\Box\\Dynamic_Revetments_OSG_2022\\SurveyDat
 # if you want to process all surveys in folder, change the following to true
 # all surveys in folder must be from same site
 process_all_surveys = False
-survey_filename = 'FC_20240105' + '.csv' # can leave blank if process_all_surveys = True
+survey_filename = 'FC_20240128' + '.csv' # can leave blank if process_all_surveys = True
 survey_columns = ['easting', 'northing', 'elevation', 'pointid', 'pointcode']
 
 # transect information - must be csv file. 
@@ -213,7 +213,7 @@ for name in survey_filename:
             
             fig1.tight_layout()
             fig_filename = fig_output_filepath + name.replace('.csv', '') + '_profiles'
-            fig1.savefig(fig_filename)
+            fig1.savefig(fig_filename, format = 'PNG')
             plt.close()       
             
     fig2, ax2 = plt.subplots()
@@ -246,5 +246,5 @@ for name in survey_filename:
     ax2.text(0.1, 0.1, txt, transform=ax2.transAxes)
     
     fig_filename = fig_output_filepath + name.replace('.csv', '') + '_map'
-    fig2.savefig(fig_filename)
+    fig2.savefig(fig_filename, format='PNG')
     plt.close()       
